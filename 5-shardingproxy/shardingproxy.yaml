@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    app: shardingproxy
+  name: shardingproxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: shardingproxy
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: shardingproxy
+    spec:
+      volumes:
+      - name: config
+        configMap:
+          name: sharding
+      - name: mysql
+        persistentVolumeClaim:
+          claimName: sharding-pvc
+      containers:
+      - image: apache/sharding-proxy
+        name: shardingsphere-proxy
+        env:
+        - name: JVM_OPTS
+          value: "-Djava.awt.headless=true"
+        volumeMounts:
+        - name: config
+          mountPath: /opt/shardingsphere-proxy/conf
+        - name: mysql
+          mountPath: /opt/shardingsphere-proxy/ext-lib
+        resources: {}
+status: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    app: shardingproxy
+  name: shardingproxy
+spec:
+  ports:
+  - port: 3306
+    protocol: TCP
+    targetPort: 3307
+    nodePort: 30882
+  selector:
+    app: shardingproxy
+  type: NodePort
+status:
+  loadBalancer: {}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sharding-pvc
+spec:
+  storageClassName: nfs
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi

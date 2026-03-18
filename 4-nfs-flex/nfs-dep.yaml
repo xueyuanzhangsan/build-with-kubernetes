@@ -1,0 +1,39 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: nfs-client-provisioner
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: nfs-client-provisioner
+  template:
+    metadata:
+      labels:
+        app: nfs-client-provisioner
+    spec:
+      serviceAccount: nfs-provisioner
+#      imagePullSecrets:
+#      - name: myhub
+      containers:
+        - name: nfs-client-provisioner
+          image: liuyi71sinacom/nfs-client-provisioner
+          #可以一试 image: quay.io/external_storage/nfs-client-provisioner:latest
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: nfs-client-root
+              mountPath: /persistentvolumes
+          env:
+            - name: PROVISIONER_NAME
+              value: fuseim.pri/ifs
+            - name: NFS_SERVER
+              value: 192.168.3.81
+            - name: NFS_PATH
+              value: /home/nfs-server
+      volumes:
+        - name: nfs-client-root
+          nfs:
+            server: 192.168.3.81
+            path: /home/nfs-server

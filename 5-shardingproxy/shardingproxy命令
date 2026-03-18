@@ -1,0 +1,22 @@
+--修改配置文件
+修改逻辑库名称  
+连接地址
+
+--启动
+
+kubectl create cm sharding --from-file=conf/server.yaml --from-file=conf/config-readwrite-splitting.yaml
+kubectl create -f shardingproxy.yaml
+kubectl get pod,deployment,pvc,svc -n production
+
+将jdbc放入pv问价夹内
+
+--登录sharding
+kubectl exec -it mysql-master-0 -- mysql -h shardingproxy -P3306 -uroot -p123456
+
+--验证
+Show databases;
+Use micromall;
+Show tables;
+create table mytbl(id Intonated varchar(20));
+insert into mytbl values (1,@@hostname);
+select * from mytbl;

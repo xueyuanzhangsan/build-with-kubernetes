@@ -1,0 +1,5 @@
+1-垃圾箱
+.DS_Store
+*.gz
+*.tar.gz
+.gitignore.swp

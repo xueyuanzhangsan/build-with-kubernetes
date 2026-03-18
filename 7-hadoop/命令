@@ -1,0 +1,15 @@
+file 30900
+name 30870
+yam  30088
+
+
+docker build -t 192.168.3.81:30002/wiseco/hadoop:3.3.2 . --no-cache
+docker push 192.168.3.81:30002/wiseco/hadoop:3.3.2
+
+安装
+helm install hadoop ./hadoop-on-k8s-master/  -n hadoop
+
+helm install hadoop ./hadoop -n hadoop
+
+卸载
+helm uninstall hadoop -n hadoop

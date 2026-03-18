@@ -1,0 +1,41 @@
+安装 helm
+curl -SLO https://get.helm.sh/helm-v3.7.1-linux-amd64.tar.gz
+tar -zxvf  helm-v3.7.1-linux-amd64.tar.gz
+mv  linux-amd64/helm  /usr/local/bin/helm
+helm version
+
+阿里云镜像源
+helm repo remove stable
+helm repo add stable http://mirror.azure.cn/kubernetes/charts/
+helm repo update 
+
+安装harbor
+vim value.yaml
+expose:
+  type: nodePort #修改为nodePort
+  tls:
+    enabled: false   #不使用ssl,修改为false
+externalURL: http://192.168.188.198:30002
+
+helm install harbor ./harbor -f value.yaml
+http://192.168.3.81:30002
+
+
+cat <<END > /etc/docker/daemon.json
+{
+    "registry-mirrors": [
+        "https://qiqjmucd.mirror.aliyuncs.com"
+    ],
+    "insecure-registries": [
+        "http://192.168.3.81:30002"
+    ]
+}
+END
+
+tee /etc/docker/daemon.json <<-'EOF'
+{
+  "registry-mirrors": ["https://qiqjmucd.mirror.aliyuncs.com"]
+}
+EOF
+sudo systemctl daemon-reload
+sudo systemctl restart docker

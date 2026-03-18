@@ -1,0 +1,83 @@
+image:
+  repository: 192.168.3.81:30002/wiseco/hadoop
+  tag: 3.3.2
+  pullPolicy: IfNotPresent
+hadoopVersion: 3.3.2
+logLevel: INFO
+antiAffinity: "soft"
+
+hdfs:
+  nameNode:
+    pdbMinAvailable: 1
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "10m"
+      limits:
+        memory: "2048Mi"
+        cpu: "1000m"
+  dataNode:
+    externalHostname: example.com
+    externalDataPortRangeStart: 50500
+    externalHTTPPortRangeStart: 51000
+    replicas: 1
+    pdbMinAvailable: 1
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "10m"
+      limits:
+        memory: "2048Mi"
+        cpu: "1000m"
+  webhdfs:
+    enabled: true
+
+yarn:
+  resourceManager:
+    pdbMinAvailable: 1
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "10m"
+      limits:
+        memory: "2048Mi"
+        cpu: "2000m"
+  nodeManager:
+    pdbMinAvailable: 1
+    replicas: 1
+    parallelCreate: false
+    resources:
+      requests:
+        memory: "2048Mi"
+        cpu: "1000m"
+      limits:
+        memory: "2048Mi"
+        cpu: "1000m"
+
+persistence:
+  nameNode:
+    enabled: true
+    storageClass: "nfs"
+    accessMode: ReadWriteOnce
+    size: 5Gi
+  dataNode:
+    enabled: true
+    storageClass: "nfs"
+    accessMode: ReadWriteOnce
+    size: 20Gi
+    
+service:
+  nameNode:
+    type: NodePort
+    ports:
+      dfs: 9000
+      webhdfs: 9870
+    nodePorts:
+      dfs: 30900
+      webhdfs: 30870
+  resourceManager:
+    type: NodePort
+    ports:
+      web: 8088
+    nodePorts:
+      web: 30088

@@ -1,0 +1,23 @@
+docker pull ghcr.io/fleeksoft/hbase/hbase-base:2.4.13.2
+
+# tag
+docker tag ghcr.io/fleeksoft/hbase/hbase-base:2.4.13.2 192.168.3.81:30002/wiseco/hbase-base:2.4.13.2
+
+# push
+docker push 192.168.3.81:30002/wiseco/hbase-base:2.4.13.2
+
+
+
+docker build -t 192.168.3.81:30002/wiseco/hadoop:2.7.3 . --no-cache
+docker push 192.168.3.81:30002/wiseco/hadoop:2.7.3
+docker rmi 2e2a82eb937a
+
+docker build -t 192.168.3.81:30002/wiseco/hadoop:3.3.2 . --no-cache
+docker push 192.168.3.81:30002/wiseco/hadoop:3.3.2
+
+安装
+helm install hbase ./hbase -n test
+helm install hbase ./ -n test
+
+卸载
+helm uninstall hbase -n test

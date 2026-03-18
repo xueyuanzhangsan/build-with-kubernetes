@@ -1,0 +1,38 @@
+--安装nfs服务器 
+Server
+	yum install nfs-utils rpcbind -y
+	systemctl enable rpcbind nfs-server
+	systemctl start rpcbind nfs-server
+	systemctl status rpcbind nfs-server
+	
+	mkdir /nfs-server
+	vi /etc/exports
+	/nfs-server *(rw,sync,no_root_squash)
+	exportfs -a
+	
+	showmount -e own ip add(如不加可能报错，确保防火墙已经关闭）
+	showmount -e # 默认查看自己共享的服务，前提是要 DNS 能解析自己，不然容易报错
+	showmount -a # 显示已经与客户端连接上的目录信息
+Client
+	yum install nfs-utils rpcbind -y
+	systemctl enable rpcbind nfs-server
+	systemctl start rpcbind nfs-server
+	systemctl status rpcbind nfs-server
+	
+	showmount -e 192.168.3.81
+	mount -t nfs 192.168.3.81 :/home/nfs-server /home
+	umount /home
+	可以共享：自己创建的目录不能进行 mount.
+Note: 在每一个节点都需要安装
+
+--配置动态供应
+  RBAC、Deployment sc安装
+  kubectl apply -f  nfs-dep.yaml,rbac.yaml,sc-nfs.yaml
+  
+  注意：rbac中的 namespace
+
+--测试
+
+  kubectl apply -f test-pod.yaml
+  
+  kubectl get pv,pvc

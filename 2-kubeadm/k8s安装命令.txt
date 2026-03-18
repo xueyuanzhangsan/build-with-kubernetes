@@ -1,0 +1,194 @@
+--初始化
+永久关闭防火墙
+systemctl stop firewalld 
+systemctl disable firewalld
+
+关闭 Swap
+swapoff -a
+sed -i 's/.*swap.*/#&/' /etc/fstab
+
+#禁用 SELINUX ???
+setenforce 0
+sed -i "s/^SELINUX=enforcing/SELINUX=disabled/g" /etc/sysconfig/selinux
+sed -i "s/^SELINUX=enforcing/SELINUX=disabled/g" /etc/selinux/config
+sed -i "s/^SELINUX=permissive/SELINUX=disabled/g" /etc/sysconfig/selinux
+sed -i "s/^SELINUX=permissive/SELINUX=disabled/g" /etc/selinux/config
+
+创建/etc/sysctl.d/k8s.conf 文件，添加如下内容：
+cat >>/etc/sysctl.d/k8s.conf<< OFF
+net.bridge.bridge-nf-call-ip6tables = 1
+net.bridge.bridge-nf-call-iptables = 1
+net.ipv4.ip_forward = 1
+OFF
+#执行如下命令使修改生效：
+modprobe br_netfilter
+sysctl -p /etc/sysctl.d/k8s.conf
+
+加载 s ipvs  模块
+modprobe -- ip_vs
+modprobe -- ip_vs_rr
+modprobe -- ip_vs_wrr
+modprobe -- ip_vs_sh
+modprobe -- nf_conntrack_ipv4
+lsmod | grep ip_vs
+lsmod | grep nf_conntrack_ipv4
+yum install -y ipvsadm ipset
+
+--安装docker
+# step 1: 安装必要的一些系统工具
+yum install -y yum-utils device-mapper-persistent-data lvm2
+
+# Step 2: 设置 stable 镜像 aliyun 仓库
+yum-config-manager --add-repo http://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
+yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+yum makecache fast
+
+查看目前官方仓库的 docker 版本。
+yum list docker-ce.x86_64 --showduplicates |sort -r #从高到低列出 Docker-ce 的版本
+yum remove docker-ce docker-ce-cli containerd.io -y
+yum install docker-ce-20.10.8 docker-ce-cli-20.10.8 containerd.io-1.4.10 -y  –-allowerasing
+yum remove podman -y
+
+systemctl start docker
+systemctl enable docker --now
+
+设置Docker镜像加速器
+sudo mkdir -p /etc/docker
+sudo tee /etc/docker/daemon.json <<-'EOF'
+{
+  "registry-mirrors": ["https://qiqjmucd.mirror.aliyuncs.com"]
+}
+EOF
+sudo systemctl daemon-reload
+sudo systemctl restart docker
+
+--安装k8s
+添加镜像仓库
+cat <<EOF > /etc/yum.repos.d/kubernetes.repo
+[kubernetes]
+name=Kubernetes
+baseurl=https://mirrors.aliyun.com/kubernetes/yum/repos/kubernetes-el7-x86_64/
+enabled=1
+gpgcheck=1
+repo_gpgcheck=1
+gpgkey=https://mirrors.aliyun.com/kubernetes/yum/doc/yum-key.gpg
+https://mirrors.aliyun.com/kubernetes/yum/doc/rpm-package-key.gpg
+EOF
+
+yum list kubeadm --showduplicates |sort -r
+yum remove kubeadm.x86_64 kubectl.x86_64 kubelet.x86_64 -y
+yum install kubeadm-1.21.5 kubectl-1.21.5 kubelet-1.21.5 -y
+
+其他版本
+yum install kubeadm-1.18.3 kubectl-1.18.3 kubelet-1.18.3 -y
+yum install kubeadm kubectl kubelet -y
+
+kubectl version
+启动 kubelet
+systemctl daemon-reload
+systemctl start kubelet.service
+systemctl enable kubelet.service
+systemctl status kubelet.service
+
+初始化k8s
+kubeadm init --image-repository registry.aliyuncs.com/google_containers --kubernetes-version=v1.21.5 --pod-network-cidr=10.10.0.0/16 --service-cidr=10.20.0.0/16 --apiserver-advertise-address=192.168.3.81
+
+按照提示
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+join
+kubeadm join 192.168.3.81:6443 --token ym553n.j1kovq9whhpv79j4 \
+	--discovery-token-ca-cert-hash sha256:437497726252e37287cb2c4c3a75a34e2b8db9e16c75cdb0123f5c5f480ec591
+
+修改其中的port=0 注释上 否则报错
+vim /etc/kubernetes/manifests/kube-controller-manager.yaml
+vim /etc/kubernetes/manifests/kube-scheduler.yaml
+vim /etc/kubernetes/manifests/kube-apiserver.yaml
+
+安装flannel网络插件
+wget https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+修改网卡名
+args:
+- --ip-masq
+- --kube-subnet-mgr
+- --iface=enp0s8
+kubectl apply -f kube-flannel.yaml
+
+证书过期问题
+kubeadm token create --print-join-command
+kubectl get node
+我们可以看到该节点已经加入到集群中去了，然后我们把 master 节点的~/.kube/config 文件拷贝到当前
+拷贝文件，从 master
+node role change
+kubectl label nodes k18-5 node-role.kubernetes.io/node=
+
+证书续期（
+kubeadm 默认证书为一年，一年过期后，会导致 api service 不可用，使用过程中会出
+现：x509: certificate has expired or is not yet valid.
+证书默认存放目录：/etc/kubernetes/pki
+1.查询当前证书过期时间
+kubeadm alpha certs check-expiration
+也可以直接查看证书
+cd /etc/kubernetes/pki
+for i in `ll /etc/kubernetes/pki | grep crt | awk '{print $9}'`;do echo $i && openssl x509 -in $i -
+noout -text |grep Not;done
+
+2.备份
+cp -R /etc/kubernetes/pki /etc/kubernetes/pki_bakup
+
+3.续期证书
+kubeadm alpha certs renew all --config=/root/cluster.yaml
+也可以单个更新
+更新下 kubeconfig 文件
+Kubeadm config view >kubeadm.yaml
+kubeadm init phase kubeconfig all --config kubeadm.yaml
+
+.4.再次查看证书有效期
+kubeadm alpha certs check-expiration
+
+5.重新启动 kubelet
+
+6.Node kubelet 过期
+On master node
+kubeadm init phase kubeconfig kubelet --node-name k18-5 --kubeconfig-dir /tmp/ --apiserver-advertise-address 192.168.56.5
+scp /tmp/kubelet.conf k18-5:/etc/kubernetes/
+systemctl restart kubelet
+
+k get csr
+NAME AGE SIGNERNAME
+REQUESTOR CONDITION
+csr-bksnq 6m1s kubernetes.io/kube-apiserver-client-
+kubelet system:node:k15-46 Pending
+[root@k15-46 kubernetes]# kubectl certificate approve csr-bksnqcertificatesigningrequest.certificates.k8s.io/csr-bksnq approved
+[root@k15-46 kubernetes]# k get csr
+NAME AGE SIGNERNAME
+REQUESTOR CONDITION
+csr-bksnq 6m28s kubernetes.io/kube-apiserver-
+client-kubelet system:node:k15-46
+Approved
+openssl x509 -in kubelet-client-current.pem -noout -text | grep "Not"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

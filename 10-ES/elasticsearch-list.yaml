@@ -1,0 +1,106 @@
+kind: List
+apiVersion: v1
+items:
+- apiVersion: apps/v1
+  kind: StatefulSet
+  metadata:
+    name: es-cluster
+  spec:
+    serviceName: elasticsearch
+    selector:
+      matchLabels:
+        app: elasticsearch
+    replicas: 3
+    template:
+      metadata:
+        labels:
+          app: elasticsearch
+      spec:
+        containers:
+        - name: elasticsearch
+          image: registry.cn-chengdu.aliyuncs.com/wangyunan_images_public/elasticsearch-oss:6.4.3
+          ports:
+          - containerPort: 9200
+            name: rest
+            protocol: TCP
+          - name: inter-node
+            containerPort: 9300
+            protocol: TCP
+          volumeMounts:
+          - name: elasticsearch-nfs-storage
+            mountPath: /usr/share/elasticsearch/data
+          env:
+          - name: cluster.name
+            value: k8s-logs
+          - name: node.name
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: discovery.zen.ping.unicast.hosts
+            value: "es-cluster-0.elasticsearch,es-cluster-1.elasticsearch,es-cluster-2.elasticsearch"
+          - name: discovery.zen.minimum_master_nodes
+            value: "2"
+          - name: ES_JAVA_OPTS
+            value: "-Xms512m -Xmx512m"
+          - name: network.host
+            value: "0.0.0.0"
+        initContainers:
+        - name: fix-permissions
+          image: busybox
+          command: ["sh", "-c", "chown -R 1000:1000 /usr/share/elasticsearch/data"]
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name:  elasticsearch-nfs-storage
+              mountPath:  /usr/share/elasticsearch/data
+        - name: increase-vm-max-map
+          image:  busybox
+          command: ["sysctl", "-w", "vm.max_map_count=262144"]
+          securityContext:
+            privileged: true
+        - name: increase-fd-ulimit
+          image:  busybox
+          command: ["sh", "-c", "ulimit -n 65536"]
+          securityContext:
+            privileged: true
+    volumeClaimTemplates:
+    - metadata:
+        name: elasticsearch-nfs-storage
+        labels:
+          app: elasticsearch
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        storageClassName: nfs
+        resources:
+          requests:
+            storage: 8Gi
+- apiVersion: v1
+  kind: Service
+  metadata: 
+    name: elasticsearch-nodeport
+  spec:
+    type: NodePort
+    ports:
+    - name: http
+      port: 9200
+      targetPort: 9200
+      nodePort: 31002
+    - name: tcp
+      port: 9300
+      targetPort: 9300
+      nodePort: 31003
+    selector:
+      app: elasticsearch
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: elasticsearch
+  spec:
+    clusterIP: None
+    ports:
+    - name: http
+      port: 9200
+    - name: tcp
+      port: 9300
+    selector:
+      app: elasticsearch

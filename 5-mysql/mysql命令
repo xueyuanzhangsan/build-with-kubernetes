@@ -1,0 +1,59 @@
+--主服务器
+
+kubectl create cm master-cm --from-file=my.cnf
+kubectl apply -f mysql-master.yaml
+
+主数据库上用户的设置
+kubectl exec -it mysql-master-0 -- mysql -h mysql-master -uroot -p123456
+
+Slave 数据库使用来连接的账户并授权
+grant replication slave on *.* to 'myslave'@'10.10.%.%' identified by 'myslave@123AC';
+grant all privileges on *.* to 'myslave'@'mysql-slave-0.mysql-slave' identified by'myslave@123AC';
+with grant option;
+
+root 账户授权
+GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' IDENTIFIED BY '123456';
+flush privileges;
+
+查看用户状态
+use mysql;
+select host,user from user;
+show master status;
+
+--从服务器
+
+kubectl create cm slave-cm --from-file=my.cnf
+kubectl apply -f mysql-slave.yaml
+kubectl exec -it mysql-slave-0 -- mysql -h mysql-slave -uroot -p123456
+
+GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' IDENTIFIED BY '123456';
+flush privileges;
+select host,user from mysql.user;
+
+Slave 数据库连接主数据库设置
+change master to master_host='mysql-master',master_user='myslave',master_password='myslave@123AC',master_log_file='mysql-bin.000003';
+start slave;
+
+#查看 slave 配置
+show slave status \G;
+#Check status
+看见下面说明成功
+Slave_IO_Running: Yes
+Slave_SQL_Running: Yes
+
+--验证
+create database test;
+use test
+CREATE TABLE customer( id INT AUTO_INCREMENT, NAME VARCHAR(200), PRIMARYKEY(id) );
+show tables;
+drop database test;
+show databases;
+
+@@hostname 测试
+create database test;
+use test
+create table mytbl(id INT,name varchar(20));
+insert into mytbl values (1,@@hostname);
+use test
+select * from mytbl;
+insert into mytbl values (2,@@server_id);

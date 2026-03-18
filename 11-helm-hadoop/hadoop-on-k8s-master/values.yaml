@@ -1,0 +1,131 @@
+image:
+  repository: 192.168.3.81:30002/wiseco/hadoop
+  tag: 2.7.3
+  pullPolicy: IfNotPresent
+
+# The version of the hadoop libraries being used in the image.
+hadoopVersion: 2.7.3
+logLevel: INFO
+
+# Select antiAffinity as either hard or soft, default is soft
+antiAffinity: "soft"
+
+hdfs:
+  nameNode:
+    replicas: 1
+    pdbMinAvailable: 1
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "10m"
+      limits:
+        memory: "2048Mi"
+        cpu: "1000m"
+
+  dataNode:
+    # Will be used as dfs.datanode.hostname
+    # You still need to set up services + ingress for every DN
+    # Datanodes will expect to
+    externalHostname: example.com
+    externalDataPortRangeStart: 9866
+    externalHTTPPortRangeStart: 9864
+
+    replicas: 3
+    pdbMinAvailable: 1
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "10m"
+      limits:
+        memory: "2048Mi"
+        cpu: "1000m"
+
+  webhdfs:
+    enabled: true
+
+yarn:
+  resourceManager:
+    pdbMinAvailable: 1
+
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "10m"
+      limits:
+        memory: "2048Mi"
+        cpu: "2000m"
+
+  nodeManager:
+    pdbMinAvailable: 1
+
+    # The number of YARN NodeManager instances.
+    replicas: 1
+
+    # Create statefulsets in parallel (K8S 1.7+)
+    parallelCreate: false
+
+    # CPU and memory resources allocated to each node manager pod.
+    # This should be tuned to fit your workload.
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "500m"
+      limits:
+        memory: "2048Mi"
+        cpu: "1000m"
+
+persistence:
+  nameNode:
+    enabled: true
+    storageClass: "nfs"
+    accessMode: ReadWriteOnce
+    size: 1Gi
+
+  dataNode:
+    enabled: true
+    enabledStorageClass: true
+    storageClass: "nfs"
+    accessMode: ReadWriteOnce
+    size: 5Gi
+    volumes:
+    - name: nfs
+      mountPath: /home/hdfs/datanode1
+    - name: nfs
+      mountPath: /home/hdfs/datanode2
+    - name: nfs
+      mountPath: /home/hdfs/datanode3
+
+service:
+  nameNode:
+    type: NodePort
+    ports:
+      dfs: 9000
+      webhdfs: 9870
+    nodePorts:
+      dfs: 30900
+      webhdfs: 30870
+  dataNode:
+    type: NodePort
+    ports:
+      webhdfs: 9864
+    nodePorts:
+      webhdfs: 30864
+  resourceManager:
+    type: NodePort
+    ports:
+      web: 8088
+    nodePorts:
+      web: 30088
+  
+  journalNode:
+    type: ClusterIP
+    ports:
+      jn: 8485
+    nodePorts:
+      jn: ""
+    
+
+securityContext:
+  runAsUser: 9999
+  privileged: true
+
