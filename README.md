@@ -19,7 +19,7 @@ ok let me tell you about the project what i need to do
 
 this is big service group they need big and strong maintenance team but we donot have， so you know
 
-this the project architecture diagram link
+this the project architecture diagram https://github.com/xueyuanzhangsan/build-with-kubernetes/blob/main/AD.jpg
 
 there have a few part about the serivce
 
